@@ -1,5 +1,6 @@
 {
   "name": "esp-idf",
   "sdk": "python",
+  "source": ".",
   "engineVersion": "v0.12.7"
 }
