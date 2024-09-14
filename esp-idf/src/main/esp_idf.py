@@ -1,8 +1,3 @@
-"""The ESP-IDF (Espressif IoT Development Framework) is a software development framework for the ESP32 chip series by Espressif.
-
-The idf.py command-line tool provides a front-end to easily manage your project builds, deployment, debugging and more. It manages CMake, Ninja and the esptool.py.
-"""
-
 from typing import Annotated
 
 import dagger
@@ -12,7 +7,7 @@ from dagger import dag, Doc, function, object_type
 @object_type
 class EspIdf:
     @function
-    async def build(
+    async def run(
         self,
         project_dir: Annotated[
             dagger.Directory, Doc("The directory containing the ESP-IDF project")
@@ -26,9 +21,9 @@ class EspIdf:
     ) -> str:
         """Execute idf.py from the official Espressif IDF Docker image
 
-        Example usage: dagger call build --project_dir . --image_version "v5.2"
+        Example usage: dagger call run --project_dir . --image_version "v5.2"
         """
-        build_output = await (
+        run_output = await (
             dag.container()
             .from_(f"espressif/idf:{image_version}")
             .with_mounted_directory("/project", project_dir)
@@ -36,4 +31,4 @@ class EspIdf:
             .with_exec(["idf.py", *idf_args], use_entrypoint=True)
             .stdout()
         )
-        return build_output
+        return run_output
