@@ -1,0 +1,6 @@
+{
+  "name": "esp-adf-docker",
+  "sdk": "python",
+  "source": "dagger",
+  "engineVersion": "v0.12.7"
+}
