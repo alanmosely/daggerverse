@@ -43,15 +43,21 @@ class EspAdfDocker:
         registry: str = "docker.io",
         username: str = "alanmosely",
     ) -> str:
-        """Build image and publish to DockerHub"""
+        """Build image and publish to DockerHub with tag adf-<ADF_RELEASE>-idf-<IDF_RELEASE>"""
 
-        file_content = await src.file("/Dockerfile").contents()
-        match = re.search(r"ARG\s+ADF_RELEASE\s*=\s*(\S+)", file_content)
+        file_content = await src.file("Dockerfile").contents()
+        adf_match = re.search(r"ARG\s+ADF_RELEASE\s*=\s*(\S+)", file_content)
+        idf_match = re.search(r"ARG\s+IDF_RELEASE\s*=\s*(\S+)", file_content)
 
-        if match:
-            adf_release = match.group(1)
+        if adf_match:
+            adf_release = adf_match.group(1)
         else:
             raise ValueError("ADF_RELEASE not found in Dockerfile")
+
+        if idf_match:
+            idf_release = idf_match.group(1)
+        else:
+            raise ValueError("IDF_RELEASE not found in Dockerfile")
 
         workspace = self.get_workspace(src)
 
@@ -62,5 +68,5 @@ class EspAdfDocker:
                 build_args=[dagger.BuildArg("DOCKER_BUILDKIT", "1")],
             )
             .with_registry_auth(registry, username, token)
-            .publish(f"{registry}/{username}/esp-adf:{adf_release}")
+            .publish(f"{registry}/{username}/esp-adf:adf-{adf_release}-idf-{idf_release}")
         )

@@ -6,7 +6,6 @@ import subprocess
 from io import BytesIO
 import urllib.request
 import json
-import serial.tools.list_ports
 import sys
 
 GITHUB_API_URL = "https://api.github.com/repos/espressif/esptool/releases/latest"
@@ -60,6 +59,13 @@ def extract_file_from_zip(zip_data, folder_in_zip, file_to_extract, temp_dir):
 
 def find_esp_device():
     """Find the COM port of the connected ESP device based on VID and PID"""
+    try:
+        import serial.tools.list_ports
+    except ImportError as exc:
+        raise Exception(
+            "pyserial is required to detect ESP devices. Install with: pip install pyserial"
+        ) from exc
+
     esp32_vid_pid = [
         ("0403", "6015"),
         ("10C4", "EA60"),
@@ -84,51 +90,63 @@ def run_in_new_terminal_windows(executable_path, args):
 
 if __name__ == "__main__":
     try:
+        if sys.platform != "win32":
+            print("This helper is Windows-only. Use a native RFC2217 server on your OS.")
+            sys.exit(1)
+
         com_port = find_esp_device()
 
-        tmp_dir = os.path.join(os.getcwd(), "tmp")
-        new_file_path = os.path.join(tmp_dir, FILE_TO_EXTRACT)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        bundled_path = os.path.join(script_dir, "tmp", FILE_TO_EXTRACT)
 
-        if not os.path.exists(new_file_path):
-            print(f"{FILE_TO_EXTRACT} does not exist, downloading and extracting it...")
+        if os.path.exists(bundled_path):
+            exe_path = bundled_path
+        else:
+            tmp_dir = os.path.join(os.getcwd(), "tmp")
+            exe_path = os.path.join(tmp_dir, FILE_TO_EXTRACT)
 
-            os.makedirs(tmp_dir, exist_ok=True)
-
-            with tempfile.TemporaryDirectory() as temp_dir:
-                print(f"Created temporary directory: {temp_dir}")
-
-                release_data = get_latest_release()
-
-                release_version = release_data["tag_name"]
-                print(f"Latest release version: {release_version}")
-
-                asset_name = f"esptool-{release_version}-win64.zip"
-                print(f"Expected asset name: {asset_name}")
-
-                asset = None
-                for a in release_data["assets"]:
-                    if asset_name in a["name"]:
-                        asset = a
-                        break
-
-                if not asset:
-                    raise Exception(
-                        f"Asset {asset_name} not found in the latest release"
-                    )
-
-                asset_url = asset["browser_download_url"]
-
-                zip_data = download_asset(asset_url)
-
-                extracted_file_path = extract_file_from_zip(
-                    zip_data, FOLDER_IN_ZIP, FILE_TO_EXTRACT, temp_dir
+            if not os.path.exists(exe_path):
+                print(
+                    f"{FILE_TO_EXTRACT} does not exist, downloading and extracting it..."
                 )
 
-                shutil.move(extracted_file_path, new_file_path)
-                print(f"Moved {FILE_TO_EXTRACT} to {new_file_path}")
+                os.makedirs(tmp_dir, exist_ok=True)
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    print(f"Created temporary directory: {temp_dir}")
+
+                    release_data = get_latest_release()
+
+                    release_version = release_data["tag_name"]
+                    print(f"Latest release version: {release_version}")
+
+                    asset_name = f"esptool-{release_version}-win64.zip"
+                    print(f"Expected asset name: {asset_name}")
+
+                    asset = None
+                    for a in release_data["assets"]:
+                        if asset_name in a["name"]:
+                            asset = a
+                            break
+
+                    if not asset:
+                        raise Exception(
+                            f"Asset {asset_name} not found in the latest release"
+                        )
+
+                    asset_url = asset["browser_download_url"]
+
+                    zip_data = download_asset(asset_url)
+
+                    extracted_file_path = extract_file_from_zip(
+                        zip_data, FOLDER_IN_ZIP, FILE_TO_EXTRACT, temp_dir
+                    )
+
+                    shutil.move(extracted_file_path, exe_path)
+                    print(f"Moved {FILE_TO_EXTRACT} to {exe_path}")
 
         args = ["-v", "-p", "4000", com_port]
-        run_in_new_terminal_windows(new_file_path, args)
+        run_in_new_terminal_windows(exe_path, args)
 
     except Exception as e:
         print(f"Error: {e}")

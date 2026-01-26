@@ -7,9 +7,11 @@ FROM espressif/idf:${IDF_RELEASE}
 ARG ADF_RELEASE
 ENV ADF_PATH=/opt/esp/adf
 
-RUN apt-get update && apt-get install -y git && apt-get clean
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --branch ${ADF_RELEASE} --single-branch --recursive https://github.com/espressif/esp-adf.git ${ADF_PATH}
+RUN git clone --branch ${ADF_RELEASE} --single-branch --recursive --depth 1 --shallow-submodules \
+    https://github.com/espressif/esp-adf.git ${ADF_PATH}
 
 WORKDIR ${ADF_PATH}
 RUN ./install.sh

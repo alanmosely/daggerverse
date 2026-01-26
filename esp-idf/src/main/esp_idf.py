@@ -11,24 +11,34 @@ class EspIdf:
     async def _execute_idf_command(
         self,
         project_dir: dagger.Directory,
-        adf_version: str,
+        adf_version: str | None,
         idf_version: str,
         idf_args: list[str],
+        use_tty: bool = False,
     ) -> str:
         """Helper function to execute idf.py commands"""
         dag_container = dag.container()
 
         if adf_version:
-            dag_container = dag_container.from_(f"alanmosely/esp-adf:{adf_version}")
+            image_ref = (
+                adf_version
+                if "/" in adf_version
+                else f"alanmosely/esp-adf:{adf_version}"
+            )
+            dag_container = dag_container.from_(image_ref)
         else:
             dag_container = dag_container.from_(f"espressif/idf:{idf_version}")
 
-        return await (
+        container = (
             dag_container.with_mounted_directory("/project", project_dir)
             .with_workdir("/project")
-            .with_exec(["idf.py", *idf_args], use_entrypoint=True)
-            .stdout()
         )
+        if use_tty:
+            container = container.with_tty()
+
+        return await container.with_exec(
+            ["idf.py", *idf_args], use_entrypoint=True
+        ).stdout()
 
     @function
     async def run(
@@ -39,17 +49,19 @@ class EspIdf:
         adf_version: Annotated[
             str | None,
             Doc(
-                "The version of the Espressif ADF Docker image to use, if specified, idf_version is ignored"
+                "The Espressif ADF image tag or full image reference to use; if set, idf_version is ignored"
             ),
-        ],
+        ] = None,
         idf_version: Annotated[
             str, Doc("The version of the Espressif IDF Docker image to use")
         ] = DEFAULT_IMAGE_VERSION,
-        idf_args: Annotated[list[str], Doc("The arguments to pass to idf.py")] = [
-            "build"
-        ],
+        idf_args: Annotated[
+            list[str] | None, Doc("The arguments to pass to idf.py")
+        ] = None,
     ) -> str:
         """Execute idf.py from the Espressif IDF or ADF Docker image, by default building the project"""
+        if idf_args is None:
+            idf_args = ["build"]
         return await self._execute_idf_command(
             project_dir, adf_version, idf_version, idf_args
         )
@@ -63,16 +75,23 @@ class EspIdf:
         adf_version: Annotated[
             str | None,
             Doc(
-                "The version of the Espressif ADF Docker image to use, if specified, idf_version is ignored"
+                "The Espressif ADF image tag or full image reference to use; if set, idf_version is ignored"
             ),
-        ],
+        ] = None,
         idf_version: Annotated[
             str, Doc("The version of the Espressif IDF Docker image to use")
         ] = DEFAULT_IMAGE_VERSION,
+        interactive: Annotated[
+            bool, Doc("Whether to allocate a TTY for menuconfig")
+        ] = True,
     ) -> str:
         """Execute "idf.py menuconfig" from the official Espressif IDF or ADF Docker image"""
         return await self._execute_idf_command(
-            project_dir, adf_version, idf_version, ["fullclean", "menuconfig"]
+            project_dir,
+            adf_version,
+            idf_version,
+            ["fullclean", "menuconfig"],
+            use_tty=interactive,
         )
 
     @function
@@ -97,19 +116,25 @@ class EspIdf:
         adf_version: Annotated[
             str | None,
             Doc(
-                "The version of the Espressif ADF Docker image to use, if specified, idf_version is ignored"
+                "The Espressif ADF image tag or full image reference to use; if set, idf_version is ignored"
             ),
-        ],
+        ] = None,
         idf_version: Annotated[
             str, Doc("The version of the Espressif IDF Docker image to use")
         ] = DEFAULT_IMAGE_VERSION,
+        serial_host: Annotated[
+            str, Doc("RFC2217 host for serial forwarding")
+        ] = "host.docker.internal",
+        serial_port: Annotated[
+            int, Doc("RFC2217 port for serial forwarding")
+        ] = 4000,
     ) -> str:
         """Execute "idf.py flash" from the official Espressif IDF or ADF Docker image using the rfc2217 protocol to connect to the host machine's serial port"""
         print(
             "\nRequires esp_rfc2217_server to be running, to set this up, download and run: https://raw.githubusercontent.com/alanmosely/daggerverse/refs/heads/master/esp-idf/src/main/resources/run_esp_rfc2217_server.py"
         )
         print(
-            "\nThis will start a server on port 4000 that will forward serial port data to the container, see: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/tools/idf-docker-image.html#using-remote-serial-port\n"
+            f"\nThis will start a server on port {serial_port} that will forward serial port data to the container, see: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/tools/idf-docker-image.html#using-remote-serial-port\n"
         )
         return await self._execute_idf_command(
             project_dir,
@@ -117,7 +142,7 @@ class EspIdf:
             idf_version,
             [
                 "--port",
-                "rfc2217://host.docker.internal:4000?ign_set_control",
+                f"rfc2217://{serial_host}:{serial_port}?ign_set_control",
                 "fullclean",
                 "build",
                 "flash",
