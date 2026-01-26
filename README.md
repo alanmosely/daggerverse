@@ -47,7 +47,7 @@ The Dagger module lives in `esp-adf-docker/dagger` and targets Dagger
 From `esp-adf-docker`:
 
 ```bash
-dagger call publish --src . --token env:DOCKER_TOKEN
+dagger call publish --src . --token file:.docker-token
 ```
 
 Expected tag format:

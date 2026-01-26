@@ -35,7 +35,7 @@ dagger call build --src .
 Publish:
 
 ```bash
-dagger call publish --src . --token env:DOCKER_TOKEN
+dagger call publish --src . --token file:.docker-token
 ```
 
 ## Conventions and gotchas

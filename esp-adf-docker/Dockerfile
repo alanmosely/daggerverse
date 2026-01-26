@@ -1,5 +1,5 @@
 # Check compatibility @ https://github.com/espressif/esp-adf?tab=readme-ov-file#idf-version
-ARG IDF_RELEASE=v5.3.1
+ARG IDF_RELEASE=v5.3.4
 ARG ADF_RELEASE=v2.7
 
 FROM espressif/idf:${IDF_RELEASE}
