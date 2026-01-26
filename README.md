@@ -120,6 +120,26 @@ latest esptool GitHub release.
 dagger develop --sdk python
 ```
 
+### Publish to Daggerverse
+
+1) Bump the version in `esp-idf/pyproject.toml`.
+
+2) Commit and tag:
+
+```bash
+git add esp-idf/pyproject.toml
+git commit -m "esp-idf: bump version to v0.0.4"
+git tag esp-idf/v0.0.4
+git push origin esp-idf/v0.0.4
+```
+
+3) Publish the module:
+
+```bash
+cd esp-idf
+dagger publish
+```
+
 ## Release automation
 
 Repo-level Dagger module to create GitHub releases.
