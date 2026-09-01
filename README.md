@@ -113,6 +113,10 @@ dagger call flash --project-dir . --serial-host host.docker.internal --serial-po
   retrieve the artifacts.
 - `flash` builds and flashes via a host RFC2217 server. You can override host
   and port, and pass `--clean` to run `fullclean` first.
+- Pass `--target esp32s3` (etc.) to `run`, `build`, `config`, or `flash` to
+  run `idf.py set-target` first.
+- Compilation uses ccache backed by a shared Dagger cache volume
+  (`esp-idf-ccache`), so warm rebuilds are much faster.
 
 ### RFC2217 helper (Windows)
 

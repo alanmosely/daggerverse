@@ -83,6 +83,10 @@ dagger call release-module --module esp-idf --version v0.0.4 --token env:GITHUB_
 - Location: `esp-idf/src/main/esp_idf.py`
 - API: `run`, `build`, `config`, `docs`, `flash`
 - `build` returns the `build/` directory for export.
+- `run`, `build`, `config`, and `flash` accept `target` to run
+  `idf.py set-target` first.
+- Compilation uses ccache via the `esp-idf-ccache` Dagger cache volume
+  (`IDF_CCACHE_ENABLE=1`, `CCACHE_DIR=/ccache`).
 - `config` runs `idf.py menuconfig` in an interactive terminal session and
   returns the resulting `sdkconfig` file (staged via a cache volume, since
   terminal sessions are ephemeral).

@@ -14,6 +14,7 @@ class EspIdf:
         project_dir: dagger.Directory,
         adf_version: str | None,
         idf_version: str,
+        target: str | None = None,
     ) -> dagger.Container:
         """Helper to create a container with the project mounted at /project"""
         if adf_version:
@@ -25,12 +26,20 @@ class EspIdf:
         else:
             image_ref = f"espressif/idf:{idf_version}"
 
-        return (
+        container = (
             dag.container()
             .from_(image_ref)
+            .with_env_variable("IDF_CCACHE_ENABLE", "1")
+            .with_env_variable("CCACHE_DIR", "/ccache")
+            .with_mounted_cache("/ccache", dag.cache_volume("esp-idf-ccache"))
             .with_mounted_directory("/project", project_dir)
             .with_workdir("/project")
         )
+        if target:
+            container = container.with_exec(
+                ["idf.py", "set-target", target], use_entrypoint=True
+            )
+        return container
 
     async def _execute_idf_command(
         self,
@@ -38,10 +47,11 @@ class EspIdf:
         adf_version: str | None,
         idf_version: str,
         idf_args: list[str],
+        target: str | None = None,
     ) -> str:
         """Helper function to execute idf.py commands"""
         return await (
-            self._idf_container(project_dir, adf_version, idf_version)
+            self._idf_container(project_dir, adf_version, idf_version, target)
             .with_exec(["idf.py", *idf_args], use_entrypoint=True)
             .stdout()
         )
@@ -64,12 +74,18 @@ class EspIdf:
         idf_args: Annotated[
             list[str] | None, Doc("The arguments to pass to idf.py")
         ] = None,
+        target: Annotated[
+            str | None,
+            Doc(
+                'The chip to build for, e.g. esp32s3; runs "idf.py set-target" first'
+            ),
+        ] = None,
     ) -> str:
         """Execute idf.py from the Espressif IDF or ADF Docker image, by default building the project"""
         if idf_args is None:
             idf_args = ["build"]
         return await self._execute_idf_command(
-            project_dir, adf_version, idf_version, idf_args
+            project_dir, adf_version, idf_version, idf_args, target
         )
 
     @function
@@ -87,6 +103,12 @@ class EspIdf:
         idf_version: Annotated[
             str, Doc("The version of the Espressif IDF Docker image to use")
         ] = DEFAULT_IMAGE_VERSION,
+        target: Annotated[
+            str | None,
+            Doc(
+                'The chip to build for, e.g. esp32s3; runs "idf.py set-target" first'
+            ),
+        ] = None,
     ) -> dagger.Directory:
         """Execute "idf.py build" and return the build output directory
 
@@ -94,7 +116,7 @@ class EspIdf:
         dagger call build --project-dir . export --path ./build
         """
         return (
-            self._idf_container(project_dir, adf_version, idf_version)
+            self._idf_container(project_dir, adf_version, idf_version, target)
             .with_exec(["idf.py", "build"], use_entrypoint=True)
             .directory("/project/build")
         )
@@ -114,6 +136,12 @@ class EspIdf:
         idf_version: Annotated[
             str, Doc("The version of the Espressif IDF Docker image to use")
         ] = DEFAULT_IMAGE_VERSION,
+        target: Annotated[
+            str | None,
+            Doc(
+                'The chip to configure for, e.g. esp32s3; runs "idf.py set-target" first'
+            ),
+        ] = None,
     ) -> dagger.File:
         """Execute "idf.py menuconfig" interactively and return the resulting sdkconfig
 
@@ -124,7 +152,7 @@ class EspIdf:
         """
         staging = dag.cache_volume("esp-idf-menuconfig")
         return (
-            self._idf_container(project_dir, adf_version, idf_version)
+            self._idf_container(project_dir, adf_version, idf_version, target)
             .with_mounted_cache("/staging", staging)
             .with_exec(["idf.py", "fullclean"], use_entrypoint=True)
             .terminal(
@@ -183,6 +211,12 @@ class EspIdf:
         clean: Annotated[
             bool, Doc("Run 'idf.py fullclean' before building")
         ] = False,
+        target: Annotated[
+            str | None,
+            Doc(
+                'The chip to build for, e.g. esp32s3; runs "idf.py set-target" first'
+            ),
+        ] = None,
     ) -> str:
         """Execute "idf.py flash" from the official Espressif IDF or ADF Docker image using the rfc2217 protocol to connect to the host machine's serial port
 
@@ -200,5 +234,5 @@ class EspIdf:
             idf_args.append("fullclean")
         idf_args += ["build", "flash"]
         return await self._execute_idf_command(
-            project_dir, adf_version, idf_version, idf_args
+            project_dir, adf_version, idf_version, idf_args, target
         )
