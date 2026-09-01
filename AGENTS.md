@@ -20,7 +20,9 @@ Use this as a quick ramp-up for changes in this repo. It covers the
 ## Dagger module
 
 - Location: `esp-adf-docker/dagger/`
-- API: `build(src)` and `publish(src, token, registry, username)`
+- API: `build(src)` and `publish(src, token)`
+- `registry` and `username` are module constructor args, e.g.
+  `dagger call --registry=ghcr.io --username=foo publish ...`
 - Publish tag format: `adf-<ADF_RELEASE>-idf-<IDF_RELEASE>`
 - Dockerfile is read from `src` relative path (`Dockerfile`).
 

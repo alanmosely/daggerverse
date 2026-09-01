@@ -54,6 +54,13 @@ dagger call publish --src . --token env:DOCKERHUB_TOKEN
 Expected tag format:
 `docker.io/<username>/esp-adf:adf-<ADF_RELEASE>-idf-<IDF_RELEASE>`
 
+Registry and username default to `docker.io`/`alanmosely` and can be
+overridden as module constructor arguments:
+
+```bash
+dagger call --registry=ghcr.io --username=you publish --src . --token env:DOCKERHUB_TOKEN
+```
+
 ### Secrets
 
 - Docker PAT is passed as a Dagger secret from the environment
@@ -105,7 +112,9 @@ dagger call flash --project-dir . --serial-host host.docker.internal --serial-po
 
 - `adf_version` is optional. If set, it may be either an image tag (e.g.
   `adf-v2.7-idf-v5.3.1`) or a full image reference
-  (e.g. `alanmosely/esp-adf:adf-v2.7-idf-v5.3.1`).
+  (e.g. `alanmosely/esp-adf:adf-v2.7-idf-v5.3.1`). Bare tags resolve against
+  `alanmosely/esp-adf` by default; override with the `--adf-image-repo`
+  module constructor argument.
 - `config` runs `idf.py menuconfig` interactively (requires a TTY) and returns
   the resulting `sdkconfig` as a file. Container filesystem changes are not
   written back to the host, so use `export --path ./sdkconfig` to save it.

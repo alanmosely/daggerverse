@@ -1,6 +1,7 @@
 [project]
 name = "main"
-version = "0.0.0"
+version = "0.1.0"
+description = "Repo-level Dagger module for GitHub release automation"
 dependencies = []
 
 [build-system]

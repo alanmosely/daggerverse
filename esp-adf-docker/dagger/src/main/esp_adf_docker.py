@@ -9,6 +9,11 @@ from dagger import Container, Doc, function, object_type
 class EspAdfDocker:
     """The ESP-ADF (Espressif Audio Development Framework) is the official audio development framework for the ESP32 chip series by Espressif"""
 
+    registry: Annotated[str, Doc("Registry to publish to")] = "docker.io"
+    username: Annotated[
+        str, Doc("Registry username/namespace to publish under")
+    ] = "alanmosely"
+
     @function
     def build(
         self,
@@ -27,8 +32,6 @@ class EspAdfDocker:
             dagger.Directory, Doc("Location of directory containing Dockerfile")
         ],
         token: Annotated[dagger.Secret, Doc("Docker PAT")],
-        registry: str = "docker.io",
-        username: str = "alanmosely",
     ) -> str:
         """Build image and publish to DockerHub with tag adf-<ADF_RELEASE>-idf-<IDF_RELEASE>"""
 
@@ -48,6 +51,9 @@ class EspAdfDocker:
 
         return (
             await self.build(src)
-            .with_registry_auth(registry, username, token)
-            .publish(f"{registry}/{username}/esp-adf:adf-{adf_release}-idf-{idf_release}")
+            .with_registry_auth(self.registry, self.username, token)
+            .publish(
+                f"{self.registry}/{self.username}/esp-adf:"
+                f"adf-{adf_release}-idf-{idf_release}"
+            )
         )

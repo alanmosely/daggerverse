@@ -9,6 +9,11 @@ DEFAULT_IMAGE_VERSION = "v5.1"
 
 @object_type
 class EspIdf:
+    adf_image_repo: Annotated[
+        str,
+        Doc("Image repository used when adf_version is a bare tag"),
+    ] = "alanmosely/esp-adf"
+
     def _idf_container(
         self,
         project_dir: dagger.Directory,
@@ -21,7 +26,7 @@ class EspIdf:
             image_ref = (
                 adf_version
                 if "/" in adf_version
-                else f"alanmosely/esp-adf:{adf_version}"
+                else f"{self.adf_image_repo}:{adf_version}"
             )
         else:
             image_ref = f"espressif/idf:{idf_version}"
