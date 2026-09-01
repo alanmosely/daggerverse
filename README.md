@@ -42,7 +42,7 @@ docker run --rm -it esp-adf:local /bin/bash
 ### Publish with Dagger
 
 The Dagger module lives in `esp-adf-docker/dagger` and targets Dagger
-`v0.12.7` (see `esp-adf-docker/dagger.json`).
+`v0.21.8` (see `esp-adf-docker/dagger.json`).
 
 From `esp-adf-docker`:
 

@@ -2,24 +2,15 @@ import re
 from typing import Annotated
 
 import dagger
-from dagger import Container, Doc, dag, function, object_type
+from dagger import Container, Doc, function, object_type
 
 
 @object_type
 class EspAdfDocker:
     """The ESP-ADF (Espressif Audio Development Framework) is the official audio development framework for the ESP32 chip series by Espressif"""
 
-    def get_workspace(self, src: dagger.Directory) -> dagger.Directory:
-        """Helper method to create the workspace"""
-        return (
-            dag.container()
-            .with_directory("/src", src)
-            .with_workdir("/src")
-            .directory("/src")
-        )
-
     @function
-    async def build(
+    def build(
         self,
         src: Annotated[
             dagger.Directory,
@@ -27,11 +18,7 @@ class EspAdfDocker:
         ],
     ) -> Container:
         """Build image from Dockerfile"""
-        workspace = self.get_workspace(src)
-
-        return await dag.container().build(
-            context=workspace, build_args=[dagger.BuildArg("DOCKER_BUILDKIT", "1")]
-        )
+        return src.docker_build()
 
     @function
     async def publish(
@@ -59,14 +46,8 @@ class EspAdfDocker:
         else:
             raise ValueError("IDF_RELEASE not found in Dockerfile")
 
-        workspace = self.get_workspace(src)
-
         return (
-            await dag.container()
-            .build(
-                context=workspace,
-                build_args=[dagger.BuildArg("DOCKER_BUILDKIT", "1")],
-            )
+            await self.build(src)
             .with_registry_auth(registry, username, token)
             .publish(f"{registry}/{username}/esp-adf:adf-{adf_release}-idf-{idf_release}")
         )

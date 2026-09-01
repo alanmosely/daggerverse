@@ -1,4 +1,4 @@
-/sdk
 /.venv
 /**/__pycache__
+/sdk
 /.env

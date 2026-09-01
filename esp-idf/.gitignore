@@ -1,3 +1,5 @@
 .venv
 /sdk
 src/main/resources/tmp/
+/**/__pycache__
+/.env
