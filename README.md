@@ -1,8 +1,7 @@
 # daggerverse
 
 Monorepo with small, self-contained projects. This README documents the
-`esp-adf-docker` and `esp-idf` projects. The `flutter` folder is currently
-undocumented.
+`esp-adf-docker` and `esp-idf` projects.
 
 ## esp-adf-docker
 
