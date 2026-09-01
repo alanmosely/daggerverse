@@ -3,6 +3,13 @@
 Monorepo with small, self-contained projects. This README documents the
 `esp-adf-docker` and `esp-idf` projects.
 
+## Requirements
+
+- Dagger CLI `v0.21.8` or later — all modules pin `engineVersion: v0.21.8`
+  in their `dagger.json` (install per <https://docs.dagger.io/install>).
+- A running container runtime (e.g. Docker) for the Dagger engine.
+- Python 3 with `pyserial` only if you use the Windows RFC2217 flash helper.
+
 ## esp-adf-docker
 
 Builds an ESP-ADF (Espressif Audio Development Framework) Docker image on top
@@ -18,7 +25,8 @@ of Espressif's official ESP-IDF image.
 
 - `esp-adf-docker/Dockerfile` — build recipe and version pins.
 - `esp-adf-docker/entrypoint.sh` — sources ESP-ADF env.
-- `esp-adf-docker/dagger/` — Dagger module for build/publish.
+- `esp-adf-docker/dagger/` — Dagger module source for build/publish (the
+  module root is `esp-adf-docker/`; run `dagger` commands from there).
 
 ### Versions and tag format
 
@@ -38,13 +46,17 @@ docker build -t esp-adf:local esp-adf-docker
 docker run --rm -it esp-adf:local /bin/bash
 ```
 
-### Publish with Dagger
+### Build and publish with Dagger
 
-The Dagger module lives in `esp-adf-docker/dagger` and targets Dagger
-`v0.21.8` (see `esp-adf-docker/dagger.json`).
+Run these from `esp-adf-docker/`. Build without publishing (returns the
+built container — chain e.g. `terminal` or `platform` on it):
 
-From `esp-adf-docker`, with a Docker Hub PAT in the `DOCKERHUB_TOKEN`
-environment variable:
+```bash
+dagger call build --src .
+```
+
+Publish, with a Docker Hub PAT in the `DOCKERHUB_TOKEN` environment
+variable:
 
 ```bash
 dagger call publish --src . --token env:DOCKERHUB_TOKEN
@@ -77,46 +89,74 @@ an ESP-ADF image.
 
 ### Usage
 
-List functions:
+The easiest way to use the module is remotely from Daggerverse, run from
+your ESP-IDF firmware project's directory:
+
+```bash
+dagger call -m github.com/alanmosely/daggerverse/esp-idf build --project-dir . export --path ./build
+```
+
+Pin a version by appending `@esp-idf/vX.Y.Z` to the module ref, or add it
+as a dependency of your own module with
+`dagger install github.com/alanmosely/daggerverse/esp-idf`.
+
+With a local checkout, run from `esp-idf/` (where the module's
+`dagger.json` lives) and point `--project-dir` at your firmware project —
+note that `--project-dir .` would mount the module directory itself, which
+is not an ESP-IDF project. Running `dagger functions` from the repo root
+lists the repo-level release module instead of this one.
+
+List functions (from `esp-idf/`):
 
 ```bash
 dagger functions
 ```
 
-Run a build:
+Run an arbitrary idf.py command (defaults to `build`):
 
 ```bash
-dagger call run --project-dir . --idf-version v5.1 --idf-args build
+dagger call run --project-dir <your-project> --idf-args build
 ```
 
 Build and export the artifacts (bootloader, partition table, app binary):
 
 ```bash
-dagger call build --project-dir . export --path ./build
+dagger call build --project-dir <your-project> export --path ./build
 ```
 
 Menuconfig (interactive) and export the resulting `sdkconfig`:
 
 ```bash
-dagger call config --project-dir . export --path ./sdkconfig
+dagger call config --project-dir <your-project> export --path ./sdkconfig
+```
+
+Render the project docs (official IDF image only; no `--adf-version` or
+`--target` support):
+
+```bash
+dagger call docs --project-dir <your-project>
 ```
 
 Flash (RFC2217):
 
 ```bash
-dagger call flash --project-dir . --serial-host host.docker.internal --serial-port 4000
+dagger call flash --project-dir <your-project> --serial-host host.docker.internal --serial-port 4000
 ```
 
 ### Notes
 
+- `idf_version` selects the `espressif/idf` image tag and defaults to
+  `v5.1`; it is ignored entirely when `adf_version` is set.
 - `adf_version` is optional. If set, it may be either an image tag (e.g.
-  `adf-v2.7-idf-v5.3.1`) or a full image reference
-  (e.g. `alanmosely/esp-adf:adf-v2.7-idf-v5.3.1`). Bare tags resolve against
-  `alanmosely/esp-adf` by default; override with the `--adf-image-repo`
-  module constructor argument.
+  `adf-v2.7-idf-v5.3.4`) or a full image reference
+  (e.g. `alanmosely/esp-adf:adf-v2.7-idf-v5.3.4`). Bare tags (no `/`)
+  resolve against `alanmosely/esp-adf` by default; override with the
+  `--adf-image-repo` module constructor argument.
 - `config` runs `idf.py menuconfig` interactively (requires a TTY) and returns
   the resulting `sdkconfig` as a file. Container filesystem changes are not
   written back to the host, so use `export --path ./sdkconfig` to save it.
+  It runs `idf.py fullclean` before menuconfig within its own session (this
+  does not affect later builds, which mount the project fresh).
 - `build` returns the `build/` directory; use `export --path ./build` to
   retrieve the artifacts.
 - `flash` builds and flashes via a host RFC2217 server. You can override host
@@ -135,33 +175,45 @@ pip install pyserial
 python esp-idf/src/main/resources/run_esp_rfc2217_server.py
 ```
 
-If `esp_rfc2217_server.exe` is not present, it will be downloaded from the
-latest esptool GitHub release.
+It auto-detects the connected ESP device's COM port by USB VID/PID (an ESP
+board must be plugged in), then starts `esp_rfc2217_server.exe` in a new
+terminal window serving that port on TCP port 4000 — matching `flash`'s
+default `--serial-host host.docker.internal --serial-port 4000`. If
+`esp_rfc2217_server.exe` is not present, it is downloaded from the latest
+esptool GitHub release.
 
 ### Development
 
+From `esp-idf/`: edit `src/main/esp_idf.py`, then run `dagger develop` to
+regenerate the `sdk/` bindings. Verify with `dagger functions` and
+`dagger call <function> --help`, then run a real build against an ESP-IDF
+project (create one with `idf.py create-project` or copy an example from
+the espressif/esp-idf repo). There are no automated tests.
+
 ```bash
-dagger develop --sdk python
+dagger develop
 ```
 
 ### Publish to Daggerverse
 
-1) Bump the version in `esp-idf/pyproject.toml`.
+1) Pick the next version above the highest existing `esp-idf/*` tag
+(`git tag --list "esp-idf/*"`) and set it (without the `v`) in
+`esp-idf/pyproject.toml`.
 
 2) Commit, tag, and push (master and the tag):
 
 ```bash
 git add esp-idf/pyproject.toml
-git commit -m "esp-idf: bump version to v0.0.6"
-git tag esp-idf/v0.0.6
-git push origin master esp-idf/v0.0.6
+git commit -m "esp-idf: bump version to vX.Y.Z"
+git tag esp-idf/vX.Y.Z
+git push origin master esp-idf/vX.Y.Z
 ```
 
 3) Verify the tag points at `HEAD` and the repo is clean:
 
 ```bash
 git rev-parse HEAD
-git rev-parse esp-idf/v0.0.6
+git rev-parse esp-idf/vX.Y.Z
 git status
 ```
 
@@ -171,18 +223,22 @@ publishes modules from public git tags. Either submit the module at
 module remotely:
 
 ```bash
-dagger functions -m github.com/alanmosely/daggerverse/esp-idf@esp-idf/v0.0.6
+dagger functions -m github.com/alanmosely/daggerverse/esp-idf@esp-idf/vX.Y.Z
 ```
 
 ## Release automation
 
-Repo-level Dagger module to create GitHub releases.
+Repo-level Dagger module to create GitHub releases. The token needs the
+`repo` scope (classic) or Contents read/write (fine-grained).
 
-From repo root:
+From the repo root, after the `esp-idf/vX.Y.Z` tag is pushed:
 
 ```bash
-dagger call release-module --module esp-idf --version v0.0.4 --token env:GITHUB_TOKEN
+dagger call release-module --module esp-idf --version vX.Y.Z --token env:GITHUB_TOKEN
 ```
 
-This creates a GitHub release for tag `esp-idf/v0.0.4` with auto-generated
-release notes.
+This creates a GitHub release for tag `esp-idf/vX.Y.Z` with auto-generated
+release notes. A generic `release --tag <tag>` function is also available.
+Both default to repo `alanmosely/daggerverse` and auto-generated notes;
+override with `--repo owner/name`, `--draft`, `--prerelease`,
+`--target <commitish>`, or `--generate-notes=false --body '...'`.
