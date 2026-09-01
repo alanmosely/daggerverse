@@ -4,3 +4,5 @@ This Dagger module creates an ESP-ADF Docker Image based on the official ESP-IDF
 """
 
 from .esp_adf_docker import EspAdfDocker
+
+__all__ = ["EspAdfDocker"]

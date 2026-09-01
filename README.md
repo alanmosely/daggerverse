@@ -10,6 +10,18 @@ Monorepo with small, self-contained projects. This README documents the
 - A running container runtime (e.g. Docker) for the Dagger engine.
 - Python 3 with `pyserial` only if you use the Windows RFC2217 flash helper.
 
+## CI
+
+GitHub Actions (`.github/workflows/`):
+
+- `ci.yml` — on every push/PR: ruff lint and a module-load check
+  (`dagger functions` plus a `dagger call <fn> --help`) for all three
+  modules; on pushes to master additionally a full hello-world build
+  through the esp-idf module with artifact assertions.
+- `release.yml` — on pushing a `<module>/vX.Y.Z` tag: creates the GitHub
+  release via this repo's own release module and, for `esp-idf` tags,
+  verifies the tagged module loads remotely and submits it to Daggerverse.
+
 ## esp-adf-docker
 
 Builds an ESP-ADF (Espressif Audio Development Framework) Docker image on top
@@ -209,6 +221,11 @@ git tag esp-idf/vX.Y.Z
 git push origin master esp-idf/vX.Y.Z
 ```
 
+Pushing the tag triggers the Release workflow
+(`.github/workflows/release.yml`), which creates the GitHub release and
+submits the module to Daggerverse automatically — steps 3 and 4 below are
+the pre-push sanity check and the manual fallback.
+
 3) Verify the tag points at `HEAD` and the repo is clean:
 
 ```bash
@@ -217,8 +234,8 @@ git rev-parse esp-idf/vX.Y.Z
 git status
 ```
 
-4) Publish. The `dagger publish` command no longer exists; Daggerverse
-publishes modules from public git tags. Either submit the module at
+4) Manual fallback publish. The `dagger publish` command no longer exists;
+Daggerverse publishes modules from public git tags. Either submit the module at
 <https://daggerverse.dev/publish>, or trigger auto-publish by using the
 module remotely:
 
@@ -231,7 +248,8 @@ dagger functions -m github.com/alanmosely/daggerverse/esp-idf@esp-idf/vX.Y.Z
 Repo-level Dagger module to create GitHub releases. The token needs the
 `repo` scope (classic) or Contents read/write (fine-grained).
 
-From the repo root, after the `esp-idf/vX.Y.Z` tag is pushed:
+The Release workflow runs this automatically when a `<module>/vX.Y.Z` tag
+is pushed. To run it manually from the repo root:
 
 ```bash
 dagger call release-module --module esp-idf --version vX.Y.Z --token env:GITHUB_TOKEN

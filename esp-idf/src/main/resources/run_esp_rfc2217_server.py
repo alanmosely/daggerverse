@@ -1,12 +1,12 @@
+import json
 import os
-import zipfile
-import tempfile
 import shutil
 import subprocess
-from io import BytesIO
-import urllib.request
-import json
 import sys
+import tempfile
+import urllib.request
+import zipfile
+from io import BytesIO
 
 GITHUB_API_URL = "https://api.github.com/repos/espressif/esptool/releases/latest"
 FOLDER_IN_ZIP = "esptool-win64"

@@ -4,3 +4,5 @@ The idf.py command-line tool provides a front-end to easily manage your project 
 """
 
 from .esp_idf import EspIdf
+
+__all__ = ["EspIdf"]

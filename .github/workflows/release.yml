@@ -1,0 +1,65 @@
+name: Release
+
+# Pushing a module tag (e.g. esp-idf/v0.0.7) creates the GitHub release via
+# this repo's own release module and triggers the Daggerverse publish.
+on:
+  push:
+    tags: ["*/v[0-9]*"]
+
+permissions:
+  contents: write
+
+env:
+  DAGGER_VERSION: "0.21.8"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Dagger CLI
+        run: |
+          curl -fsSL https://dl.dagger.io/dagger/install.sh \
+            | BIN_DIR="$HOME/.local/bin" DAGGER_VERSION="$DAGGER_VERSION" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Parse module and version from tag
+        id: tag
+        run: |
+          version="${GITHUB_REF_NAME##*/}"
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag version segment '$version' is not vX.Y.Z; refusing to release"
+            exit 1
+          fi
+          echo "module=${GITHUB_REF_NAME%/v*}" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub release (via this repo's release module)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Idempotent: a re-run after a partial failure must not die on
+          # 422 already_exists.
+          if curl -fsS \
+               -H "Authorization: Bearer $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" \
+               > /dev/null 2>&1; then
+            echo "Release for ${GITHUB_REF_NAME} already exists; skipping creation"
+          else
+            dagger call release-module \
+              --module "${{ steps.tag.outputs.module }}" \
+              --version "${{ steps.tag.outputs.version }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --token env:GITHUB_TOKEN \
+              --progress plain
+          fi
+      - name: Verify tagged module loads
+        if: steps.tag.outputs.module == 'esp-idf'
+        run: |
+          dagger functions \
+            -m "github.com/${GITHUB_REPOSITORY}/${{ steps.tag.outputs.module }}@${GITHUB_REF_NAME}" \
+            --progress plain
+      - name: Publish to Daggerverse
+        if: steps.tag.outputs.module == 'esp-idf'
+        run: |
+          curl -fsS -X PUT https://daggerverse.dev/crawl \
+            --data-urlencode "ref=github.com/${GITHUB_REPOSITORY}/${{ steps.tag.outputs.module }}@${GITHUB_REF_NAME}"

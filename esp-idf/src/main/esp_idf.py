@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 import dagger
-from dagger import dag, Doc, function, object_type
+from dagger import Doc, dag, function, object_type
 
 DEFAULT_IMAGE_VERSION = "v5.1"
 

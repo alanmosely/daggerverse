@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DAGGER_VERSION: "0.21.8"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install ruff
+        run: pipx install ruff==0.16.5
+      - name: Lint module sources
+        run: ruff check dagger/src esp-idf/src esp-adf-docker/dagger/src
+
+  modules:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: daggerverse
+            dir: .
+            check: release
+          - module: esp-idf
+            dir: esp-idf
+            check: build
+          - module: esp-adf-docker
+            dir: esp-adf-docker
+            check: publish
+    name: modules (${{ matrix.module }})
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Dagger CLI
+        run: |
+          curl -fsSL https://dl.dagger.io/dagger/install.sh \
+            | BIN_DIR="$HOME/.local/bin" DAGGER_VERSION="$DAGGER_VERSION" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Module loads and lists functions
+        working-directory: ${{ matrix.dir }}
+        run: dagger functions --progress plain
+      - name: Function signature resolves
+        working-directory: ${{ matrix.dir }}
+        run: dagger call ${{ matrix.check }} --help --progress plain
+
+  e2e-build:
+    # Full hello-world build through the esp-idf module; heavier, so skip PRs.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Dagger CLI
+        run: |
+          curl -fsSL https://dl.dagger.io/dagger/install.sh \
+            | BIN_DIR="$HOME/.local/bin" DAGGER_VERSION="$DAGGER_VERSION" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Create hello-world ESP-IDF project
+        run: |
+          mkdir -p "$RUNNER_TEMP/hello-world/main"
+          cat > "$RUNNER_TEMP/hello-world/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.16)
+          include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+          project(hello_world)
+          EOF
+          cat > "$RUNNER_TEMP/hello-world/main/CMakeLists.txt" <<'EOF'
+          idf_component_register(SRCS "hello_world_main.c" INCLUDE_DIRS "")
+          EOF
+          cat > "$RUNNER_TEMP/hello-world/main/hello_world_main.c" <<'EOF'
+          #include <stdio.h>
+          void app_main(void) { printf("Hello world!\n"); }
+          EOF
+      - name: Build via the esp-idf module and export artifacts
+        working-directory: esp-idf
+        run: |
+          dagger call build \
+            --project-dir "$RUNNER_TEMP/hello-world" \
+            --target esp32 \
+            export --path "$RUNNER_TEMP/out" \
+            --progress plain
+      - name: Assert artifacts exist
+        run: |
+          test -f "$RUNNER_TEMP/out/hello_world.bin"
+          test -f "$RUNNER_TEMP/out/hello_world.elf"
+          test -f "$RUNNER_TEMP/out/bootloader/bootloader.bin"
+          echo "All expected build artifacts present"

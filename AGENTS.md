@@ -90,6 +90,11 @@ dagger call publish --src . --token env:DOCKERHUB_TOKEN
 
 ## How to validate changes
 
+- CI (`.github/workflows/ci.yml`) runs ruff (rules pinned in `ruff.toml`),
+  loads all three modules (`dagger functions` + a `call <fn> --help` each)
+  on every push/PR, and runs a full hello-world build through the esp-idf
+  module on pushes to master.
+- Locally: `python -m ruff check dagger/src esp-idf/src esp-adf-docker/dagger/src`.
 - After module code changes: `dagger develop`, then `dagger functions`
   (from the module root) to confirm the module still loads, and
   `dagger call <function> --help` to check signatures without executing.
@@ -114,9 +119,13 @@ public git tags. To publish esp-idf:
    `git tag esp-idf/vX.Y.Z && git push origin master esp-idf/vX.Y.Z`.
 3. Verify `git rev-parse esp-idf/vX.Y.Z` matches `HEAD` and the tree is
    clean.
-4. Submit at <https://daggerverse.dev/publish>, or trigger auto-publish with
-   `dagger functions -m github.com/alanmosely/daggerverse/esp-idf@esp-idf/vX.Y.Z`.
-5. Optionally create the GitHub release (see below).
+4. Pushing the tag triggers `.github/workflows/release.yml`, which creates
+   the GitHub release and (for `esp-idf` tags) submits the module to
+   Daggerverse. Tags for other modules get a GitHub release only.
+5. Manual fallback if the workflow fails: submit at
+   <https://daggerverse.dev/publish> (or
+   `curl -X PUT https://daggerverse.dev/crawl --data-urlencode "ref=github.com/alanmosely/daggerverse/esp-idf@esp-idf/vX.Y.Z"`),
+   and create the release with the command below.
 
 ## Release automation
 
@@ -127,7 +136,8 @@ public git tags. To publish esp-idf:
 
 ### Typical flow
 
-From the repo root, after the `esp-idf/vX.Y.Z` tag is pushed:
+`.github/workflows/release.yml` runs this automatically on tag push. Manual
+equivalent, from the repo root after the `esp-idf/vX.Y.Z` tag is pushed:
 
 ```bash
 dagger call release-module --module esp-idf --version vX.Y.Z --token env:GITHUB_TOKEN

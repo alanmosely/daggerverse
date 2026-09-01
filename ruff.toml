@@ -1,0 +1,6 @@
+# Repo-pinned lint rules so local runs and CI agree regardless of any
+# user-level ruff configuration.
+extend-exclude = ["**/sdk", "**/.venv"]
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I"]
