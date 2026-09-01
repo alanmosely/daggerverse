@@ -1,2 +1,3 @@
 .venv
 /sdk
+src/main/resources/tmp/

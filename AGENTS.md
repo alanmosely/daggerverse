@@ -80,8 +80,11 @@ dagger call release-module --module esp-idf --version v0.0.4 --token env:GITHUB_
 ## esp-idf module
 
 - Location: `esp-idf/src/main/esp_idf.py`
-- API: `run`, `config`, `docs`, `flash`
-- `config` runs `idf.py menuconfig` and uses a TTY by default.
+- API: `run`, `build`, `config`, `docs`, `flash`
+- `build` returns the `build/` directory for export.
+- `config` runs `idf.py menuconfig` in an interactive terminal session and
+  returns the resulting `sdkconfig` file (staged via a cache volume, since
+  terminal sessions are ephemeral).
 - `flash` connects to RFC2217 on `serial_host`/`serial_port`.
 
 ### esp-idf flows
@@ -92,10 +95,16 @@ Build:
 dagger call run --project-dir . --idf-version v5.1 --idf-args build
 ```
 
-Menuconfig:
+Build and export artifacts:
 
 ```bash
-dagger call config --project-dir .
+dagger call build --project-dir . export --path ./build
+```
+
+Menuconfig (exports the resulting sdkconfig):
+
+```bash
+dagger call config --project-dir . export --path ./sdkconfig
 ```
 
 Flash (RFC2217):
@@ -106,7 +115,7 @@ dagger call flash --project-dir . --serial-host host.docker.internal --serial-po
 
 ## esp-idf gotchas
 
-- `config` is interactive; non-TTY environments may fail unless `interactive=false`.
+- `config` is interactive and requires a TTY; run it from a terminal.
 - `flash` requires an RFC2217 server on the host. The helper script is
   Windows-only and needs `pyserial`.
 

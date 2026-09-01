@@ -82,10 +82,16 @@ Run a build:
 dagger call run --project-dir . --idf-version v5.1 --idf-args build
 ```
 
-Menuconfig (interactive):
+Build and export the artifacts (bootloader, partition table, app binary):
 
 ```bash
-dagger call config --project-dir .
+dagger call build --project-dir . export --path ./build
+```
+
+Menuconfig (interactive) and export the resulting `sdkconfig`:
+
+```bash
+dagger call config --project-dir . export --path ./sdkconfig
 ```
 
 Flash (RFC2217):
@@ -99,7 +105,11 @@ dagger call flash --project-dir . --serial-host host.docker.internal --serial-po
 - `adf_version` is optional. If set, it may be either an image tag (e.g.
   `adf-v2.7-idf-v5.3.1`) or a full image reference
   (e.g. `alanmosely/esp-adf:adf-v2.7-idf-v5.3.1`).
-- `config` runs `idf.py menuconfig`, which is interactive and requests a TTY.
+- `config` runs `idf.py menuconfig` interactively (requires a TTY) and returns
+  the resulting `sdkconfig` as a file. Container filesystem changes are not
+  written back to the host, so use `export --path ./sdkconfig` to save it.
+- `build` returns the `build/` directory; use `export --path ./build` to
+  retrieve the artifacts.
 - `flash` connects to a host RFC2217 server. You can override host and port.
 
 ### RFC2217 helper (Windows)

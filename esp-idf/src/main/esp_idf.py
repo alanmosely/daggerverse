@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Annotated
 
 import dagger
@@ -8,37 +9,42 @@ DEFAULT_IMAGE_VERSION = "v5.1"
 
 @object_type
 class EspIdf:
-    async def _execute_idf_command(
+    def _idf_container(
         self,
         project_dir: dagger.Directory,
         adf_version: str | None,
         idf_version: str,
-        idf_args: list[str],
-        use_tty: bool = False,
-    ) -> str:
-        """Helper function to execute idf.py commands"""
-        dag_container = dag.container()
-
+    ) -> dagger.Container:
+        """Helper to create a container with the project mounted at /project"""
         if adf_version:
             image_ref = (
                 adf_version
                 if "/" in adf_version
                 else f"alanmosely/esp-adf:{adf_version}"
             )
-            dag_container = dag_container.from_(image_ref)
         else:
-            dag_container = dag_container.from_(f"espressif/idf:{idf_version}")
+            image_ref = f"espressif/idf:{idf_version}"
 
-        container = (
-            dag_container.with_mounted_directory("/project", project_dir)
+        return (
+            dag.container()
+            .from_(image_ref)
+            .with_mounted_directory("/project", project_dir)
             .with_workdir("/project")
         )
-        if use_tty:
-            container = container.with_tty()
 
-        return await container.with_exec(
-            ["idf.py", *idf_args], use_entrypoint=True
-        ).stdout()
+    async def _execute_idf_command(
+        self,
+        project_dir: dagger.Directory,
+        adf_version: str | None,
+        idf_version: str,
+        idf_args: list[str],
+    ) -> str:
+        """Helper function to execute idf.py commands"""
+        return await (
+            self._idf_container(project_dir, adf_version, idf_version)
+            .with_exec(["idf.py", *idf_args], use_entrypoint=True)
+            .stdout()
+        )
 
     @function
     async def run(
@@ -67,7 +73,7 @@ class EspIdf:
         )
 
     @function
-    async def config(
+    def build(
         self,
         project_dir: Annotated[
             dagger.Directory, Doc("The directory containing the ESP-IDF project")
@@ -81,17 +87,63 @@ class EspIdf:
         idf_version: Annotated[
             str, Doc("The version of the Espressif IDF Docker image to use")
         ] = DEFAULT_IMAGE_VERSION,
-        interactive: Annotated[
-            bool, Doc("Whether to allocate a TTY for menuconfig")
-        ] = True,
-    ) -> str:
-        """Execute "idf.py menuconfig" from the official Espressif IDF or ADF Docker image"""
-        return await self._execute_idf_command(
-            project_dir,
-            adf_version,
-            idf_version,
-            ["fullclean", "menuconfig"],
-            use_tty=interactive,
+    ) -> dagger.Directory:
+        """Execute "idf.py build" and return the build output directory
+
+        Export the artifacts locally with:
+        dagger call build --project-dir . export --path ./build
+        """
+        return (
+            self._idf_container(project_dir, adf_version, idf_version)
+            .with_exec(["idf.py", "build"], use_entrypoint=True)
+            .directory("/project/build")
+        )
+
+    @function
+    def config(
+        self,
+        project_dir: Annotated[
+            dagger.Directory, Doc("The directory containing the ESP-IDF project")
+        ],
+        adf_version: Annotated[
+            str | None,
+            Doc(
+                "The Espressif ADF image tag or full image reference to use; if set, idf_version is ignored"
+            ),
+        ] = None,
+        idf_version: Annotated[
+            str, Doc("The version of the Espressif IDF Docker image to use")
+        ] = DEFAULT_IMAGE_VERSION,
+    ) -> dagger.File:
+        """Execute "idf.py menuconfig" interactively and return the resulting sdkconfig
+
+        Requires a TTY (run via "dagger call" in a terminal). Dagger terminal
+        sessions are ephemeral, so the saved sdkconfig is staged on a cache
+        volume and returned as a file. Export it back into your project with:
+        dagger call config --project-dir . export --path ./sdkconfig
+        """
+        staging = dag.cache_volume("esp-idf-menuconfig")
+        return (
+            self._idf_container(project_dir, adf_version, idf_version)
+            .with_mounted_cache("/staging", staging)
+            .with_exec(["idf.py", "fullclean"], use_entrypoint=True)
+            .terminal(
+                cmd=[
+                    "/bin/bash",
+                    "-c",
+                    "rm -f /staging/sdkconfig"
+                    " && . $IDF_PATH/export.sh"
+                    " && idf.py menuconfig"
+                    " && cp sdkconfig /staging/sdkconfig",
+                ]
+            )
+            # cache volume contents are not part of Dagger's cache key, so
+            # force the copy below to re-run on every call
+            .with_env_variable(
+                "CACHE_BUSTER", datetime.now(timezone.utc).isoformat()
+            )
+            .with_exec(["cp", "/staging/sdkconfig", "/sdkconfig"])
+            .file("/sdkconfig")
         )
 
     @function
