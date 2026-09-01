@@ -44,10 +44,11 @@ docker run --rm -it esp-adf:local /bin/bash
 The Dagger module lives in `esp-adf-docker/dagger` and targets Dagger
 `v0.21.8` (see `esp-adf-docker/dagger.json`).
 
-From `esp-adf-docker`:
+From `esp-adf-docker`, with a Docker Hub PAT in the `DOCKERHUB_TOKEN`
+environment variable:
 
 ```bash
-dagger call publish --src . --token file:.docker-token
+dagger call publish --src . --token env:DOCKERHUB_TOKEN
 ```
 
 Expected tag format:
@@ -55,8 +56,8 @@ Expected tag format:
 
 ### Secrets
 
-- Docker PAT is passed as a Dagger secret.
-- `.docker-token` is ignored by git (see `esp-adf-docker/.gitignore`).
+- Docker PAT is passed as a Dagger secret from the environment
+  (`env:DOCKERHUB_TOKEN`); avoid writing tokens to files.
 
 ## esp-idf
 
@@ -110,7 +111,8 @@ dagger call flash --project-dir . --serial-host host.docker.internal --serial-po
   written back to the host, so use `export --path ./sdkconfig` to save it.
 - `build` returns the `build/` directory; use `export --path ./build` to
   retrieve the artifacts.
-- `flash` connects to a host RFC2217 server. You can override host and port.
+- `flash` builds and flashes via a host RFC2217 server. You can override host
+  and port, and pass `--clean` to run `fullclean` first.
 
 ### RFC2217 helper (Windows)
 

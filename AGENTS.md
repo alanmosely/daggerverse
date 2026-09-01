@@ -32,10 +32,10 @@ Build only:
 dagger call build --src .
 ```
 
-Publish:
+Publish (Docker Hub PAT in the `DOCKERHUB_TOKEN` environment variable):
 
 ```bash
-dagger call publish --src . --token file:.docker-token
+dagger call publish --src . --token env:DOCKERHUB_TOKEN
 ```
 
 ## Conventions and gotchas
@@ -45,7 +45,8 @@ dagger call publish --src . --token file:.docker-token
 - Dockerfile uses a shallow clone for speed; avoid removing it unless you
   need full history.
 - Keep `entrypoint.sh` minimal; it is run for every container invocation.
-- `.docker-token` is intentionally git-ignored.
+- Pass the Docker PAT via `env:DOCKERHUB_TOKEN`; never write tokens to files
+  (`.docker-token` remains git-ignored as a safety net).
 
 ## How to validate changes
 

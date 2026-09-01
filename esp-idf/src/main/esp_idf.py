@@ -180,23 +180,25 @@ class EspIdf:
         serial_port: Annotated[
             int, Doc("RFC2217 port for serial forwarding")
         ] = 4000,
+        clean: Annotated[
+            bool, Doc("Run 'idf.py fullclean' before building")
+        ] = False,
     ) -> str:
-        """Execute "idf.py flash" from the official Espressif IDF or ADF Docker image using the rfc2217 protocol to connect to the host machine's serial port"""
-        print(
-            "\nRequires esp_rfc2217_server to be running, to set this up, download and run: https://raw.githubusercontent.com/alanmosely/daggerverse/refs/heads/master/esp-idf/src/main/resources/run_esp_rfc2217_server.py"
-        )
-        print(
-            f"\nThis will start a server on port {serial_port} that will forward serial port data to the container, see: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/tools/idf-docker-image.html#using-remote-serial-port\n"
-        )
+        """Execute "idf.py flash" from the official Espressif IDF or ADF Docker image using the rfc2217 protocol to connect to the host machine's serial port
+
+        Requires an RFC2217 server running on the host that forwards the
+        device's serial port (on Windows, download and run
+        https://raw.githubusercontent.com/alanmosely/daggerverse/refs/heads/master/esp-idf/src/main/resources/run_esp_rfc2217_server.py),
+        see:
+        https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/tools/idf-docker-image.html#using-remote-serial-port
+        """
+        idf_args = [
+            "--port",
+            f"rfc2217://{serial_host}:{serial_port}?ign_set_control",
+        ]
+        if clean:
+            idf_args.append("fullclean")
+        idf_args += ["build", "flash"]
         return await self._execute_idf_command(
-            project_dir,
-            adf_version,
-            idf_version,
-            [
-                "--port",
-                f"rfc2217://{serial_host}:{serial_port}?ign_set_control",
-                "fullclean",
-                "build",
-                "flash",
-            ],
+            project_dir, adf_version, idf_version, idf_args
         )
