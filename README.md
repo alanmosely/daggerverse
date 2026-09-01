@@ -148,32 +148,31 @@ dagger develop --sdk python
 
 1) Bump the version in `esp-idf/pyproject.toml`.
 
-2) Commit, tag, and push the tag:
+2) Commit, tag, and push (master and the tag):
 
 ```bash
 git add esp-idf/pyproject.toml
-git commit -m "esp-idf: bump version to v0.0.4"
-git tag esp-idf/v0.0.4
-git push origin esp-idf/v0.0.4
+git commit -m "esp-idf: bump version to v0.0.6"
+git tag esp-idf/v0.0.6
+git push origin master esp-idf/v0.0.6
 ```
 
 3) Verify the tag points at `HEAD` and the repo is clean:
 
 ```bash
 git rev-parse HEAD
-git rev-parse esp-idf/v0.0.4
+git rev-parse esp-idf/v0.0.6
 git status
 ```
 
-4) Publish the module (from the module directory):
+4) Publish. The `dagger publish` command no longer exists; Daggerverse
+publishes modules from public git tags. Either submit the module at
+<https://daggerverse.dev/publish>, or trigger auto-publish by using the
+module remotely:
 
 ```bash
-cd esp-idf
-dagger publish
+dagger functions -m github.com/alanmosely/daggerverse/esp-idf@esp-idf/v0.0.6
 ```
-
-If you publish with `--force`, Daggerverse will use the commit SHA instead of
-the tag. To publish a versioned release, keep the repo clean.
 
 ## Release automation
 
