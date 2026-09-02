@@ -8,16 +8,17 @@ Monorepo with small, self-contained projects. This README documents the
 - Dagger CLI `v0.21.8` or later — all modules pin `engineVersion: v0.21.8`
   in their `dagger.json` (install per <https://docs.dagger.io/install>).
 - A running container runtime (e.g. Docker) for the Dagger engine.
-- Python 3 with `pyserial` only if you use the Windows RFC2217 flash helper.
+- Python 3 with esptool >= 5.0 only if you use the RFC2217 flash helper.
 
 ## CI
 
 GitHub Actions (`.github/workflows/`):
 
-- `ci.yml` — on every push/PR: ruff lint and a module-load check
-  (`dagger functions` plus a `dagger call <fn> --help`) for all three
-  modules; on pushes to master additionally a full hello-world build
-  through the esp-idf module with artifact assertions.
+- `ci.yml` — on every push/PR: ruff lint, module-load checks
+  (`dagger functions` plus a `dagger call <fn> --help`), and the cheap
+  module self-tests (`dagger check`) for the release and esp-adf-docker
+  modules; on pushes to master additionally the esp-idf self-test — a full
+  hello-world firmware build with artifact assertions.
 - `release.yml` — on pushing a `<module>/vX.Y.Z` tag: creates the GitHub
   release via this repo's own release module and, for `esp-idf` tags,
   verifies the tagged module loads remotely and submits it to Daggerverse.
@@ -142,6 +143,12 @@ Menuconfig (interactive) and export the resulting `sdkconfig`:
 dagger call config --project-dir <your-project> export --path ./sdkconfig
 ```
 
+Show the size report (`--components` for per-component sizes):
+
+```bash
+dagger call size --project-dir <your-project>
+```
+
 Render the project docs (official IDF image only; no `--adf-version` or
 `--target` support):
 
@@ -173,34 +180,37 @@ dagger call flash --project-dir <your-project> --serial-host host.docker.interna
   retrieve the artifacts.
 - `flash` builds and flashes via a host RFC2217 server. You can override host
   and port, and pass `--clean` to run `fullclean` first.
-- Pass `--target esp32s3` (etc.) to `run`, `build`, `config`, or `flash` to
-  run `idf.py set-target` first.
+- Pass `--target esp32s3` (etc.) to `run`, `build`, `config`, `size`, or
+  `flash` to run `idf.py set-target` first.
 - Compilation uses ccache backed by a shared Dagger cache volume
   (`esp-idf-ccache`), so warm rebuilds are much faster.
 
-### RFC2217 helper (Windows)
+### RFC2217 helper
 
-The helper script is Windows-only and requires `pyserial`:
+The helper script works on Windows, Linux, and macOS. It requires
+esptool >= 5.0, which provides the `esp_rfc2217_server` command and
+`pyserial`:
 
 ```bash
-pip install pyserial
+pip install "esptool>=5.0"
 python esp-idf/src/main/resources/run_esp_rfc2217_server.py
 ```
 
-It auto-detects the connected ESP device's COM port by USB VID/PID (an ESP
-board must be plugged in), then starts `esp_rfc2217_server.exe` in a new
-terminal window serving that port on TCP port 4000 — matching `flash`'s
-default `--serial-host host.docker.internal --serial-port 4000`. If
-`esp_rfc2217_server.exe` is not present, it is downloaded from the latest
-esptool GitHub release.
+It auto-detects the connected ESP device's serial port by USB VID/PID (an
+ESP board must be plugged in; pass the port explicitly to skip detection,
+e.g. `run_esp_rfc2217_server.py COM3`), then serves it in the foreground on
+TCP port 4000 — matching `flash`'s default
+`--serial-host host.docker.internal --serial-port 4000`. Override the TCP
+port with `--tcp-port`.
 
 ### Development
 
 From `esp-idf/`: edit `src/main/esp_idf.py`, then run `dagger develop` to
 regenerate the `sdk/` bindings. Verify with `dagger functions` and
-`dagger call <function> --help`, then run a real build against an ESP-IDF
-project (create one with `idf.py create-project` or copy an example from
-the espressif/esp-idf repo). There are no automated tests.
+`dagger call <function> --help`, then run the module's self-test with
+`dagger check` — it builds a hello-world firmware project and verifies the
+artifacts. All three modules define such self-tests as Dagger checks
+(`dagger check -l` lists them).
 
 ```bash
 dagger develop

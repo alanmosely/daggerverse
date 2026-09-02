@@ -28,12 +28,17 @@ jobs:
           - module: daggerverse
             dir: .
             check: release
+            # cheap self-tests: run on every push/PR
+            run_checks: true
           - module: esp-idf
             dir: esp-idf
             check: build
+            # its check is a full firmware build: runs in e2e-build instead
+            run_checks: false
           - module: esp-adf-docker
             dir: esp-adf-docker
             check: publish
+            run_checks: true
     name: modules (${{ matrix.module }})
     steps:
       - uses: actions/checkout@v5
@@ -48,9 +53,17 @@ jobs:
       - name: Function signature resolves
         working-directory: ${{ matrix.dir }}
         run: dagger call ${{ matrix.check }} --help --progress plain
+      - name: Checks are registered
+        working-directory: ${{ matrix.dir }}
+        run: dagger check -l --progress plain
+      - name: Run module checks
+        if: ${{ matrix.run_checks }}
+        working-directory: ${{ matrix.dir }}
+        run: dagger check --progress plain
 
   e2e-build:
-    # Full hello-world build through the esp-idf module; heavier, so skip PRs.
+    # esp-idf's self-test check is a full hello-world firmware build with
+    # artifact assertions; heavier, so skip PRs.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -61,32 +74,6 @@ jobs:
           curl -fsSL https://dl.dagger.io/dagger/install.sh \
             | BIN_DIR="$HOME/.local/bin" DAGGER_VERSION="$DAGGER_VERSION" sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Create hello-world ESP-IDF project
-        run: |
-          mkdir -p "$RUNNER_TEMP/hello-world/main"
-          cat > "$RUNNER_TEMP/hello-world/CMakeLists.txt" <<'EOF'
-          cmake_minimum_required(VERSION 3.16)
-          include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-          project(hello_world)
-          EOF
-          cat > "$RUNNER_TEMP/hello-world/main/CMakeLists.txt" <<'EOF'
-          idf_component_register(SRCS "hello_world_main.c" INCLUDE_DIRS "")
-          EOF
-          cat > "$RUNNER_TEMP/hello-world/main/hello_world_main.c" <<'EOF'
-          #include <stdio.h>
-          void app_main(void) { printf("Hello world!\n"); }
-          EOF
-      - name: Build via the esp-idf module and export artifacts
+      - name: Run esp-idf module checks (full hello-world build)
         working-directory: esp-idf
-        run: |
-          dagger call build \
-            --project-dir "$RUNNER_TEMP/hello-world" \
-            --target esp32 \
-            export --path "$RUNNER_TEMP/out" \
-            --progress plain
-      - name: Assert artifacts exist
-        run: |
-          test -f "$RUNNER_TEMP/out/hello_world.bin"
-          test -f "$RUNNER_TEMP/out/hello_world.elf"
-          test -f "$RUNNER_TEMP/out/bootloader/bootloader.bin"
-          echo "All expected build artifacts present"
+        run: dagger check --progress plain

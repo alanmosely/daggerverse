@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 import dagger
-from dagger import Doc, dag, function, object_type
+from dagger import Doc, check, dag, function, object_type
 
 DEFAULT_IMAGE_VERSION = "v5.1"
 
@@ -180,6 +180,43 @@ class EspIdf:
         )
 
     @function
+    async def size(
+        self,
+        project_dir: Annotated[
+            dagger.Directory, Doc("The directory containing the ESP-IDF project")
+        ],
+        adf_version: Annotated[
+            str | None,
+            Doc(
+                "The Espressif ADF image tag or full image reference to use; if set, idf_version is ignored"
+            ),
+        ] = None,
+        idf_version: Annotated[
+            str, Doc("The version of the Espressif IDF Docker image to use")
+        ] = DEFAULT_IMAGE_VERSION,
+        target: Annotated[
+            str | None,
+            Doc(
+                'The chip to build for, e.g. esp32s3; runs "idf.py set-target" first'
+            ),
+        ] = None,
+        components: Annotated[
+            bool, Doc('Report per-component sizes ("idf.py size-components")')
+        ] = False,
+    ) -> str:
+        """Execute "idf.py size" (or "size-components") and return the size report
+
+        Builds the project first if needed (size reads the linker map file).
+        """
+        return await self._execute_idf_command(
+            project_dir,
+            adf_version,
+            idf_version,
+            ["size-components" if components else "size"],
+            target,
+        )
+
+    @function
     async def docs(
         self,
         project_dir: Annotated[
@@ -226,9 +263,9 @@ class EspIdf:
         """Execute "idf.py flash" from the official Espressif IDF or ADF Docker image using the rfc2217 protocol to connect to the host machine's serial port
 
         Requires an RFC2217 server running on the host that forwards the
-        device's serial port (on Windows, download and run
-        https://raw.githubusercontent.com/alanmosely/daggerverse/refs/heads/master/esp-idf/src/main/resources/run_esp_rfc2217_server.py),
-        see:
+        device's serial port. Cross-platform helper (needs esptool >= 5.0):
+        https://raw.githubusercontent.com/alanmosely/daggerverse/refs/heads/master/esp-idf/src/main/resources/run_esp_rfc2217_server.py
+        See:
         https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/tools/idf-docker-image.html#using-remote-serial-port
         """
         idf_args = [
@@ -241,3 +278,41 @@ class EspIdf:
         return await self._execute_idf_command(
             project_dir, adf_version, idf_version, idf_args, target
         )
+
+    @function
+    @check
+    async def check_build(self) -> None:
+        """Self-test: build a minimal hello-world project and verify the artifacts"""
+        project = (
+            dag.directory()
+            .with_new_file(
+                "CMakeLists.txt",
+                "cmake_minimum_required(VERSION 3.16)\n"
+                "include($ENV{IDF_PATH}/tools/cmake/project.cmake)\n"
+                "project(hello_world)\n",
+            )
+            .with_new_file(
+                "main/CMakeLists.txt",
+                'idf_component_register(SRCS "hello_world_main.c" INCLUDE_DIRS "")\n',
+            )
+            .with_new_file(
+                "main/hello_world_main.c",
+                '#include <stdio.h>\nvoid app_main(void) { printf("Hello world!\\n"); }\n',
+            )
+        )
+        build_dir = self.build(project, target="esp32")
+        entries = await build_dir.entries()
+        missing = [
+            name
+            for name in ("hello_world.bin", "hello_world.elf")
+            if name not in entries
+        ]
+        if missing:
+            raise ValueError(
+                f"build artifacts missing: {missing}; build dir contains: {entries}"
+            )
+        bootloader = await build_dir.directory("bootloader").entries()
+        if "bootloader.bin" not in bootloader:
+            raise ValueError(
+                f"bootloader.bin missing; bootloader dir contains: {bootloader}"
+            )

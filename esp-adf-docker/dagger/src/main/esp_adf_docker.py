@@ -2,7 +2,7 @@ import re
 from typing import Annotated
 
 import dagger
-from dagger import Container, Doc, function, object_type
+from dagger import Container, Doc, check, dag, function, object_type
 
 
 @object_type
@@ -57,3 +57,12 @@ class EspAdfDocker:
                 f"adf-{adf_release}-idf-{idf_release}"
             )
         )
+
+    @function
+    @check
+    async def check_build(self) -> None:
+        """Self-test: the Dockerfile build path works on a minimal context"""
+        src = dag.directory().with_new_file(
+            "Dockerfile", "FROM alpine:3.20\nRUN echo ok\n"
+        )
+        await self.build(src).sync()

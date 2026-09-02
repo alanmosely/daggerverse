@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 import dagger
-from dagger import Doc, dag, function, object_type
+from dagger import Doc, check, dag, function, object_type
 
 DEFAULT_REPO = "alanmosely/daggerverse"
 GITHUB_API_VERSION = "2022-11-28"
@@ -13,6 +13,22 @@ CURL_IMAGE = "curlimages/curl:8.21.0"
 
 @object_type
 class Daggerverse:
+    def _validate_repo(self, repo: str) -> None:
+        if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
+            raise ValueError(f"Invalid repo (expected owner/name): {repo}")
+
+    @function
+    @check
+    def check_repo_validation(self) -> None:
+        """Self-test: repo validation accepts owner/name and rejects malformed refs"""
+        self._validate_repo(DEFAULT_REPO)
+        for bad in ("owner", "owner/name/extra", "owner/na me", "$(rm -rf /)/x"):
+            try:
+                self._validate_repo(bad)
+            except ValueError:
+                continue
+            raise ValueError(f"malformed repo {bad!r} was not rejected")
+
     async def _create_release(
         self,
         token: dagger.Secret,
@@ -25,8 +41,7 @@ class Daggerverse:
         draft: bool,
         prerelease: bool,
     ) -> str:
-        if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
-            raise ValueError(f"Invalid repo (expected owner/name): {repo}")
+        self._validate_repo(repo)
 
         release_name = name or tag
         payload: dict[str, object] = {

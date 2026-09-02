@@ -48,7 +48,8 @@ containing the module's `dagger.json` (relative args like `--src .` and
 ## Dagger module
 
 - Module root: `esp-adf-docker/` (source in `esp-adf-docker/dagger/src/main/`)
-- API: `build(src)` and `publish(src, token)`
+- API: `build(src)` and `publish(src, token)` (+ the `check-build`
+  self-test)
 - `registry` and `username` are module constructor args, e.g.
   `dagger call --registry=ghcr.io --username=foo publish ...`
 - Publish tag format: `adf-<ADF_RELEASE>-idf-<IDF_RELEASE>`
@@ -90,10 +91,13 @@ dagger call publish --src . --token env:DOCKERHUB_TOKEN
 
 ## How to validate changes
 
+- Every module defines self-tests as Dagger checks (`@check`-decorated
+  functions named `check_*`); run them with `dagger check` from the module
+  root, list them with `dagger check -l`.
 - CI (`.github/workflows/ci.yml`) runs ruff (rules pinned in `ruff.toml`),
-  loads all three modules (`dagger functions` + a `call <fn> --help` each)
-  on every push/PR, and runs a full hello-world build through the esp-idf
-  module on pushes to master.
+  loads all three modules (`dagger functions` + a `call <fn> --help` each),
+  and runs the cheap self-tests on every push/PR; esp-idf's self-test (a
+  full hello-world firmware build) runs on pushes to master.
 - Locally: `python -m ruff check dagger/src esp-idf/src esp-adf-docker/dagger/src`.
 - After module code changes: `dagger develop`, then `dagger functions`
   (from the module root) to confirm the module still loads, and
@@ -131,6 +135,7 @@ public git tags. To publish esp-idf:
 
 - Location: `dagger/src/main/release.py`
 - API: `release(tag, ...)` and `release_module(module, version, ...)`
+  (+ the `check-repo-validation` self-test)
 - Uses GitHub API to create releases and optional auto-generated notes.
 - Token needs `repo` scope (classic) or Contents read/write (fine-grained).
 
@@ -161,9 +166,12 @@ notes.
 ## esp-idf module
 
 - Location: `esp-idf/src/main/esp_idf.py`
-- API: `run`, `build`, `config`, `docs`, `flash`
+- API: `run`, `build`, `config`, `size`, `docs`, `flash` (+ the
+  `check-build` self-test)
 - `build` returns the `build/` directory for export.
-- `run`, `build`, `config`, and `flash` accept `target` to run
+- `size` returns the `idf.py size` report (`--components` for the
+  per-component breakdown); it builds first if needed.
+- `run`, `build`, `config`, `size`, and `flash` accept `target` to run
   `idf.py set-target` first (`docs` supports neither `target` nor
   `adf_version`).
 - Compilation uses ccache via the `esp-idf-ccache` Dagger cache volume
@@ -207,13 +215,16 @@ dagger call flash --project-dir <your-project> --serial-host host.docker.interna
 ## esp-idf gotchas
 
 - `config` is interactive and requires a TTY; run it from a terminal.
-- `flash` requires an RFC2217 server on the host. The helper script is
-  Windows-only and needs `pyserial`.
+- `flash` requires an RFC2217 server on the host. The helper script
+  (`src/main/resources/run_esp_rfc2217_server.py`) is cross-platform and
+  requires esptool >= 5.0 (which provides `esp_rfc2217_server`).
 
 ## esp-idf validation
 
 - `dagger functions` (from `esp-idf/`)
+- `dagger check` — self-test: builds a hello-world firmware project and
+  verifies the artifacts (fast when the ccache volume is warm)
 - `dagger call build --help` and `dagger call flash --help`
 - `dagger call run --project-dir <your-project> --idf-args build` against a
-  real ESP-IDF project (create one with `idf.py create-project`); there are
-  no automated tests in the repo.
+  real ESP-IDF project (create one with `idf.py create-project`) for
+  ad-hoc runs beyond the self-test.
