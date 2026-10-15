@@ -44,10 +44,10 @@ of Espressif's official ESP-IDF image.
 ### Versions and tag format
 
 - `IDF_RELEASE` and `ADF_RELEASE` are set in `esp-adf-docker/Dockerfile`.
-- The current pair is ADF `v2.8` / IDF `v5.3.4`. `ADF_COMMIT` verifies
+- The current pair is ADF `v2.8` / IDF `v5.5.5`. `ADF_COMMIT` verifies
   `d0493218b6986e5663a5465b6e2545a336ef901d`; audio/speech submodules use
   that release's gitlinks. The bundled IDF is not cloned or selected.
-- The image applies and verifies `idf_v5.3_freertos.patch` during its build
+- The image applies and verifies `idf_v5.5_freertos.patch` during its build
   and includes `qemu-xtensa` for the firmware software gates.
 - Published image tag is:
   `adf-<ADF_RELEASE>-idf-<IDF_RELEASE>`
