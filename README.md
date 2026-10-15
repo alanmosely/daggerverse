@@ -52,6 +52,12 @@ of Espressif's official ESP-IDF image.
 - Published image tag is:
   `adf-<ADF_RELEASE>-idf-<IDF_RELEASE>`
 
+The tested ADF `v2.8` / IDF `v5.5.5` image was published on 16 October 2026 as
+`alanmosely/esp-adf:adf-v2.8-idf-v5.5.5`. For reproducible consumers, use
+`alanmosely/esp-adf@sha256:477ff29b854d09f3b5443d214821bce6ec14cae791fcd9f6ae151f7bfbc8a36c`.
+Its configuration digest is `sha256:8ff8fad96a3259f787b5d1b7f2eac3e89187c6d1a306e4e8641f700f494aadff`;
+the registry manifest and configuration digest identify different objects.
+
 ### Build locally
 
 ```bash
