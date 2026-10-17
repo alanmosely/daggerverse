@@ -49,6 +49,12 @@ of Espressif's official ESP-IDF image.
   that release's gitlinks. The bundled IDF is not cloned or selected.
 - The image applies and verifies `idf_v5.5_freertos.patch` during its build
   and includes `qemu-xtensa` for the firmware software gates.
+- `IDF_IMAGE` pins the upstream multi-platform base by manifest digest;
+  `IDF_COMMIT` independently checks the expected IDF source. A deliberate SDK
+  upgrade must update these alongside `IDF_RELEASE` and the compatible ADF pin.
+  New builds retain OS packages, SDK Python packages and ADF submodule identities
+  under `/opt/esp/build-provenance/`. OS/Python package inventories expose rebuild
+  drift; consumer reproducibility still relies on the published image digest.
 - Published image tag is:
   `adf-<ADF_RELEASE>-idf-<IDF_RELEASE>`
 
