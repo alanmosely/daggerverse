@@ -44,8 +44,25 @@ of Espressif's official ESP-IDF image.
 ### Versions and tag format
 
 - `IDF_RELEASE` and `ADF_RELEASE` are set in `esp-adf-docker/Dockerfile`.
+- The current pair is ADF `v2.8` / IDF `v5.5.5`. `ADF_COMMIT` verifies
+  `d0493218b6986e5663a5465b6e2545a336ef901d`; audio/speech submodules use
+  that release's gitlinks. The bundled IDF is not cloned or selected.
+- The image applies and verifies `idf_v5.5_freertos.patch` during its build
+  and includes `qemu-xtensa` for the firmware software gates.
+- `IDF_IMAGE` pins the upstream multi-platform base by manifest digest;
+  `IDF_COMMIT` independently checks the expected IDF source. A deliberate SDK
+  upgrade must update these alongside `IDF_RELEASE` and the compatible ADF pin.
+  New builds retain OS packages, SDK Python packages and ADF submodule identities
+  under `/opt/esp/build-provenance/`. OS/Python package inventories expose rebuild
+  drift; consumer reproducibility still relies on the published image digest.
 - Published image tag is:
   `adf-<ADF_RELEASE>-idf-<IDF_RELEASE>`
+
+The tested ADF `v2.8` / IDF `v5.5.5` image was published on 16 October 2026 as
+`alanmosely/esp-adf:adf-v2.8-idf-v5.5.5`. For reproducible consumers, use
+`alanmosely/esp-adf@sha256:477ff29b854d09f3b5443d214821bce6ec14cae791fcd9f6ae151f7bfbc8a36c`.
+Its configuration digest is `sha256:8ff8fad96a3259f787b5d1b7f2eac3e89187c6d1a306e4e8641f700f494aadff`;
+the registry manifest and configuration digest identify different objects.
 
 ### Build locally
 
