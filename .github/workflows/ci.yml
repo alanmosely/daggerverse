@@ -61,6 +61,31 @@ jobs:
         working-directory: ${{ matrix.dir }}
         run: dagger check --progress plain
 
+  adf-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the pinned ADF image
+        run: docker build --platform linux/amd64 -t esp-adf:ci esp-adf-docker
+      - name: Verify the image and compile hello-world
+        run: |
+          docker run --rm --platform linux/amd64 esp-adf:ci bash -ec '
+            idf.py --version
+            git -C "$ADF_PATH" describe --tags --exact-match HEAD
+            git -C "$ADF_PATH" submodule status components/esp-adf-libs components/esp-sr
+            idf_version=$(git -C "$IDF_PATH" describe --tags --exact-match HEAD)
+            git -C "$IDF_PATH" apply --reverse --check "$ADF_PATH/idf_patches/idf_${idf_version%.*}_freertos.patch"
+            for receipt in os-packages python-packages adf-submodules; do
+              test -s "/opt/esp/build-provenance/$receipt.txt" || exit 1
+            done
+            command -v qemu-system-xtensa
+            cp -R "$IDF_PATH/examples/get-started/hello_world" /tmp/hello_world
+            cd /tmp/hello_world
+            idf.py set-target esp32 build
+            test -s build/hello_world.bin
+          '
+
   e2e-build:
     # esp-idf's self-test check is a full hello-world firmware build with
     # artifact assertions; heavier, so skip PRs.
