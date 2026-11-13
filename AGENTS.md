@@ -178,10 +178,10 @@ notes.
   (`IDF_CCACHE_ENABLE=1`, `CCACHE_DIR=/ccache`).
 - `config` runs `idf.py fullclean` then `menuconfig` in an interactive
   terminal session and returns the resulting `sdkconfig` file (staged via a
-  cache volume, since terminal sessions are ephemeral). `/staging/sdkconfig`
-  is cleared at session start so a stale config is never returned; if the
-  session aborts before completing (non-zero exit, killed terminal), the
-  staged copy fails rather than returning stale data.
+  cache volume, since terminal sessions are ephemeral). Each invocation
+  stages under a unique path and exposes that file only after the copy
+  completes. The export consumes its staged file. An aborted session before
+  staging completes fails the export without reading another session's data.
 - `flash` connects to RFC2217 on `serial_host`/`serial_port`.
 
 ### esp-idf flows
