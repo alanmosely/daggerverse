@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
 from typing import Annotated
+from uuid import uuid4
 
 import dagger
 from dagger import Doc, check, dag, function, object_type
@@ -156,6 +156,9 @@ class EspIdf:
         dagger call config --project-dir . export --path ./sdkconfig
         """
         staging = dag.cache_volume("esp-idf-menuconfig")
+        invocation = uuid4().hex
+        staged_config = f"/staging/{invocation}.sdkconfig"
+        partial_config = f"{staged_config}.tmp"
         return (
             self._idf_container(project_dir, adf_version, idf_version, target)
             .with_mounted_cache("/staging", staging)
@@ -164,18 +167,17 @@ class EspIdf:
                 cmd=[
                     "/bin/bash",
                     "-c",
-                    "rm -f /staging/sdkconfig"
-                    " && . $IDF_PATH/export.sh"
+                    f"trap 'rm -f {partial_config}' EXIT"
+                    ' && . "$IDF_PATH/export.sh"'
                     " && idf.py menuconfig"
-                    " && cp sdkconfig /staging/sdkconfig",
+                    f" && cp sdkconfig {partial_config}"
+                    f" && mv {partial_config} {staged_config}",
                 ]
             )
             # cache volume contents are not part of Dagger's cache key, so
             # force the copy below to re-run on every call
-            .with_env_variable(
-                "CACHE_BUSTER", datetime.now(timezone.utc).isoformat()
-            )
-            .with_exec(["cp", "/staging/sdkconfig", "/sdkconfig"])
+            .with_env_variable("CACHE_BUSTER", invocation)
+            .with_exec(["mv", staged_config, "/sdkconfig"])
             .file("/sdkconfig")
         )
 
